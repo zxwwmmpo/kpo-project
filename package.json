@@ -1,0 +1,26 @@
+{
+  "name": "kpo-project",
+  "version": "1.0.0",
+  "description": "- Java 21, Spring Boot, Spring Security, Spring Data JPA\r - PostgreSQL\r - React, TypeScript, CSS\r - Maven, npm, Vite",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zxwwmmpo/kpo-project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zxwwmmpo/kpo-project/issues"
+  },
+  "homepage": "https://github.com/zxwwmmpo/kpo-project#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "husky": "^9.1.7"
+  }
+}

@@ -51,13 +51,69 @@
 		</dependency>
 	</dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.10.4</version>
+
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <lineEndings>UNIX</lineEndings>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <googleJavaFormat>
+                            <version>1.28.0</version>
+                        </googleJavaFormat>
+                    </java>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <id>check-formatting</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+
+                <configuration>
+                    <configLocation>
+                        config/checkstyle/checkstyle.xml
+                    </configLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <includeResources>false</includeResources>
+                    <includeTestResources>false</includeTestResources>
+                    <consoleOutput>true</consoleOutput>
+                    <failOnViolation>true</failOnViolation>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <id>check-java-code</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

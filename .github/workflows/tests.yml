@@ -1,0 +1,181 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run tests and generate coverage
+        run: bash mvnw -B verify
+
+      - name: Check coverage report exists
+        run: test -s target/site/jacoco/jacoco.xml
+
+      - name: Save test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/target/surefire-reports/
+            backend/target/failsafe-reports/
+          if-no-files-found: warn
+
+      - name: Save coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/target/site/jacoco/
+          if-no-files-found: warn
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests and collect coverage
+        run: |
+          mkdir -p reports
+          npm run test:coverage -- --reporter=default --reporter=junit --outputFile.junit=reports/junit.xml --coverage.reporter=html --coverage.reporter=json-summary
+
+      - name: Save frontend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-reports
+          path: frontend/reports/junit.xml
+
+      - name: Save frontend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: error
+
+  build:
+    name: Build application
+    needs: [backend-tests, frontend-tests]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build backend JAR
+        working-directory: backend
+        run: bash mvnw -B package -DskipTests
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload backend JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+          if-no-files-found: error
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          if-no-files-found: error
+
+
+  collect-metrics:
+    name: Collect quality metrics
+    needs: [ backend-tests, frontend-tests ]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download repository and Git history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download test reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-test-reports"
+          path: metrics-input
+
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-coverage"
+          path: metrics-input
+
+      - name: Calculate quality metrics
+        env:
+          STAGE_NAME: ${{ github.ref_type == 'tag' && github.ref_name || 'trial' }}
+        run: python scripts/collect_metrics.py
+
+      - name: Save metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-metrics
+          path: metrics-output/metrics.json
+          if-no-files-found: error

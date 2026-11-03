@@ -41,7 +41,7 @@ jobs:
           path: |
             backend/target/surefire-reports/
             backend/target/failsafe-reports/
-            if-no-files-found: warn
+          if-no-files-found: warn
 
       - name: Save coverage report
         if: always()
@@ -50,3 +50,42 @@ jobs:
           name: backend-coverage
           path: backend/target/site/jacoco/
           if-no-files-found: warn
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests and collect coverage
+        run: |
+          mkdir -p reports
+          npm run test:coverage -- --reporter=default --reporter=junit --outputFile.junit=reports/junit.xml --coverage.reporter=html --coverage.reporter=json-summary
+
+      - name: Save frontend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-reports
+          path: frontend/reports/junit.xml
+
+      - name: Save frontend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: error

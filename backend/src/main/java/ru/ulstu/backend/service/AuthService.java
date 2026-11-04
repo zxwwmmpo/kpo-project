@@ -6,10 +6,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.ulstu.backend.dto.LoginRequest;
 import ru.ulstu.backend.dto.RegisterRequest;
 import ru.ulstu.backend.dto.UserResponse;
 import ru.ulstu.backend.entity.User;
+import ru.ulstu.backend.repository.StudentContactRepository;
+import ru.ulstu.backend.repository.StudentProfileRepository;
 import ru.ulstu.backend.repository.UserRepository;
 
 @Service
@@ -17,6 +20,8 @@ import ru.ulstu.backend.repository.UserRepository;
 public class AuthService {
 
   private final UserRepository userRepository;
+  private final StudentContactRepository contactRepository;
+  private final StudentProfileRepository profileRepository;
   private final PasswordEncoder passwordEncoder;
 
   public UserResponse register(RegisterRequest request) {
@@ -49,7 +54,12 @@ public class AuthService {
         .map(user -> new UserResponse(user.getId(), user.getEmail()));
   }
 
+  @Transactional
   public void deleteAccount(Long userId) {
+    contactRepository.deleteByUserId(userId);
+    contactRepository.flush();
+    profileRepository.deleteByUserId(userId);
+    profileRepository.flush();
     userRepository.deleteById(userId);
   }
 }

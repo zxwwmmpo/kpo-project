@@ -1,5 +1,6 @@
 package ru.ulstu.backend;
 
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -7,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +17,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.UUID;
 import javax.imageio.ImageIO;
@@ -32,6 +36,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import ru.ulstu.backend.entity.User;
+import ru.ulstu.backend.repository.ProjectFileRepository;
 import ru.ulstu.backend.repository.UserRepository;
 
 @SpringBootTest(properties = "app.admin.enabled=false")
@@ -47,6 +52,7 @@ class StudentAccountIT {
   @Autowired private MockMvc mockMvc;
   @Autowired private UserRepository userRepository;
   @Autowired private PasswordEncoder passwordEncoder;
+  @Autowired private ProjectFileRepository projectFileRepository;
 
   private MockHttpSession admin;
   private MockHttpSession student;
@@ -82,6 +88,183 @@ class StudentAccountIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"ФИСТ\"}"))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void studentsCanCreateAndListOnlyTheirOwnProjects() throws Exception {
+    String path = "/api/profile/projects";
+    var other = authenticate("/api/auth/register", newEmail(), 201);
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+    mockMvc.perform(get(path).session(admin)).andExpect(status().isForbidden());
+    mockMvc.perform(get(path).session(student)).andExpect(jsonPath("$.length()").value(0));
+
+    mockMvc
+        .perform(
+            post(path)
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"  \",\"description\":\"Описание\"}"))
+        .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(
+            post(path)
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"  Расписание  \",\"description\":\"Описание\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").isNumber())
+        .andExpect(jsonPath("$.title").value("Расписание"))
+        .andExpect(jsonPath("$.role").value(""));
+
+    mockMvc
+        .perform(get(path).session(student))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].description").value("Описание"));
+    mockMvc
+        .perform(get(path).session(other))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void ownerUpdatesProjectAndManagesMaterials() throws Exception {
+    String collection = "/api/profile/projects";
+    var other = authenticate("/api/auth/register", newEmail(), 201);
+    String projectBody = "{\"title\":\"Расписание\",\"description\":\"Описание\"}";
+    MvcResult created =
+        mockMvc
+            .perform(
+                post(collection)
+                    .session(student)
+                    .header(AJAX_HEADER, AJAX_VALUE)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(projectBody))
+            .andExpect(status().isCreated())
+            .andReturn();
+    int projectId = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+    String path = collection + "/" + projectId;
+    String links = path + "/links";
+    String files = path + "/files";
+
+    mockMvc.perform(get(path).session(other)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            put(path)
+                .session(other)
+                .header(AJAX_HEADER, AJAX_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(projectBody))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(delete(path).session(other).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            put(path)
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"title\":\"Новый проект\",\"description\":\"Описание\",\"role\":\"Автор\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").value("Новый проект"));
+
+    for (String invalidUrl :
+        new String[] {"javascript:alert(1)", "https:example.org", "https://["}) {
+      mockMvc
+          .perform(
+              post(links)
+                  .session(student)
+                  .header(AJAX_HEADER, AJAX_VALUE)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"url\":\"" + invalidUrl + "\"}"))
+          .andExpect(status().isBadRequest());
+    }
+    mockMvc
+        .perform(
+            post(links)
+                .session(other)
+                .header(AJAX_HEADER, AJAX_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"url\":\"https://example.org\"}"))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            post(links)
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"url\":\"https://example.org\",\"label\":\"Демо\"}"))
+        .andExpect(status().isCreated());
+
+    byte[] pdf = "%PDF-1.7\n%%EOF".getBytes(StandardCharsets.UTF_8);
+    var file = new MockMultipartFile("file", "Отчёт.pdf", "application/pdf", pdf);
+    var fake = new MockMultipartFile("file", "fake.pdf", "application/pdf", new byte[] {1, 2});
+    var oversized =
+        new MockMultipartFile(
+            "file", "large.pdf", "application/pdf", new byte[5 * 1024 * 1024 + 1]);
+    mockMvc
+        .perform(multipart(files).file(fake).session(student).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(multipart(files).file(oversized).session(student).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().is(413));
+    mockMvc
+        .perform(multipart(files).file(file).session(other).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNotFound());
+
+    int fileId = uploadProjectFile(files, file);
+    mockMvc
+        .perform(get(collection).session(student))
+        .andExpect(jsonPath("$[0].fileCount").value(1))
+        .andExpect(jsonPath("$[0].linkCount").value(1));
+    String download = files + "/" + fileId;
+    mockMvc
+        .perform(get(path).session(student))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.project.title").value("Новый проект"))
+        .andExpect(jsonPath("$.files[0].name").value("Отчёт.pdf"))
+        .andExpect(jsonPath("$.files[0].size").value(pdf.length))
+        .andExpect(jsonPath("$.files[0].content").doesNotExist())
+        .andExpect(jsonPath("$.links[0].url").value("https://example.org"))
+        .andExpect(jsonPath("$.links[0].label").value("Демо"));
+    mockMvc
+        .perform(get(download).session(student))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Disposition", startsWith("attachment")))
+        .andExpect(content().bytes(pdf));
+    mockMvc.perform(get(download).session(other)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(delete(download).session(other).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(delete(download).session(student).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNoContent());
+    mockMvc.perform(get(download).session(student)).andExpect(status().isNotFound());
+
+    for (int i = 0; i < 5; i++) {
+      uploadProjectFile(files, file);
+    }
+    mockMvc
+        .perform(multipart(files).file(file).session(student).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isConflict());
+    mockMvc
+        .perform(delete(path).session(student).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNoContent());
+    mockMvc.perform(get(path).session(student)).andExpect(status().isNotFound());
+    assertEquals(0L, projectFileRepository.countByProjectId((long) projectId));
+  }
+
+  private int uploadProjectFile(String path, MockMultipartFile file) throws Exception {
+    var result =
+        mockMvc
+            .perform(multipart(path).file(file).session(student).header(AJAX_HEADER, AJAX_VALUE))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return JsonPath.read(result.getResponse().getContentAsString(), "$.id");
   }
 
   @Test

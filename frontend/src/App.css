@@ -102,6 +102,52 @@ small {
 .about-text {
   white-space: pre-wrap;
 }
+.portfolio {
+  margin-top: 20px;
+}
+.portfolio details {
+  margin-top: 16px;
+}
+.portfolio summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.portfolio-content {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+.portfolio-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.portfolio-accent {
+  color: var(--signal);
+}
+.portfolio-projects {
+  padding: 0;
+  list-style: none;
+}
+.portfolio-projects li + li {
+  margin-top: 12px;
+}
+.portfolio-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+}
+.project-materials {
+  display: grid;
+  gap: 24px;
+  margin: 24px 0;
+}
+.project-materials h4 {
+  margin: 0;
+}
+.project-materials a {
+  color: var(--accent);
+}
 .workspace {
   max-width: 1200px;
   margin: 0 auto;
@@ -350,4 +396,148 @@ small {
   overflow: hidden;
   clip-path: inset(50%);
   border: 0;
+}
+.portfolio > details {
+  position: relative;
+}
+.portfolio > details > summary {
+  font-size: 1.2rem;
+  line-height: 2.75rem;
+}
+.portfolio-actions {
+  position: absolute;
+  inset: 0 0 auto auto;
+}
+.portfolio .project-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) 7rem 7rem auto;
+  align-items: center;
+  gap: 20px;
+  text-align: left;
+  border: 1px solid var(--portfolio-line);
+  border-radius: 10px;
+  padding: 18px 22px;
+  color: inherit;
+}
+.portfolio {
+  --portfolio-line: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.project-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.project-copy strong {
+  font-size: 1.4rem;
+  line-height: 1.25;
+}
+.project-count,
+.portfolio-preview {
+  opacity: 0.8;
+}
+.project-row:hover:not(:disabled) {
+  text-decoration: none;
+  border-color: var(--accent);
+}
+.row-arrow {
+  color: var(--accent);
+  font-size: 1.4rem;
+}
+.project-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0;
+}
+.project-heading h3 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+.project-heading button {
+  flex-shrink: 0;
+}
+.project-materials {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.project-materials > section {
+  border: 1px solid var(--portfolio-line);
+  padding: 20px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.project-materials h4 {
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--portfolio-line);
+  padding-bottom: 12px;
+}
+.material-count {
+  font-size: 0.85rem;
+  padding: 2px 8px;
+  border: 1px solid var(--portfolio-line);
+  border-radius: 6px;
+  vertical-align: middle;
+}
+.project-materials ul,
+.project-materials p {
+  margin: 0;
+}
+.project-materials li.actions {
+  flex-wrap: wrap;
+}
+.project-materials li a {
+  overflow-wrap: anywhere;
+}
+.file-zone,
+.link-toggle {
+  margin-top: auto;
+}
+.link-toggle {
+  align-self: center;
+}
+.file-zone fieldset {
+  padding: 14px;
+  text-align: center;
+  border: 1px dashed var(--portfolio-line);
+  border-radius: 8px;
+  justify-items: center;
+  gap: 6px;
+}
+.file-choice {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.file-choice:focus-within {
+  outline: 2px solid var(--accent);
+}
+.file-zone fieldset:disabled {
+  opacity: 0.6;
+}
+@media (max-width: 720px) {
+  .project-materials {
+    grid-template-columns: 1fr;
+  }
+  .portfolio .project-row {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px 16px;
+  }
+  .project-copy {
+    grid-column: 1 / -1;
+  }
+  .project-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 440px) {
+  .portfolio-actions {
+    position: static;
+    justify-content: flex-start;
+  }
 }

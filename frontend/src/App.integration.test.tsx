@@ -66,6 +66,7 @@ beforeEach(() => {
     }
     if (path === '/api/profile') return Response.json(emptyProfile);
     if (path === '/api/profile/contacts') return Response.json([]);
+    if (path === '/api/profile/projects') return Response.json([]);
     if (path === '/api/profile/photo')
       return new Response(null, { status: 404 });
     if (path === '/api/catalog/faculties') return Response.json(faculties);
@@ -85,6 +86,148 @@ async function credentials(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText('Email'), student.email);
   await user.type(screen.getByLabelText('Пароль'), 'Student123!');
 }
+
+it('создаёт проект и открывает его из списка портфолио', async () => {
+  const user = userEvent.setup();
+  current = student;
+  const create = vi.fn((options: RequestInit) =>
+    Response.json(
+      { id: 1, ...JSON.parse(String(options.body)) },
+      { status: 201 },
+    ),
+  );
+  handlers.set('POST /api/profile/projects', create);
+  handlers.set('GET /api/profile/projects', () =>
+    Response.json(
+      create.mock.calls.length
+        ? [
+            {
+              id: 1,
+              ...JSON.parse(String(create.mock.calls[0][0].body)),
+              fileCount: 2,
+              linkCount: 1,
+            },
+          ]
+        : [],
+    ),
+  );
+  handlers.set('GET /api/profile/projects/1', () =>
+    Response.json({ files: [], links: [] }),
+  );
+  render(<App />);
+
+  expect(await screen.findByText('У вас пока нет проектов.')).toBeTruthy();
+  await user.click(screen.getByText('Достижения', { selector: 'summary' }));
+  expect(screen.getByText('Достижения').closest('details')?.open).toBe(true);
+
+  await user.click(screen.getByRole('button', { name: 'Добавить проект' }));
+  await user.type(screen.getByLabelText('Название'), 'Расписание');
+  await user.type(screen.getByLabelText('Описание'), 'Расписание для группы');
+  await user.type(
+    screen.getByLabelText('Роль в проекте (необязательно)'),
+    'Автор',
+  );
+  await user.click(screen.getByRole('button', { name: 'Сохранить проект' }));
+
+  expect(
+    await screen.findByRole('heading', { name: 'Расписание' }),
+  ).toBeTruthy();
+  expect(screen.getByText('Роль в проекте — Автор')).toBeTruthy();
+  expect(create).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole('button', { name: /К списку проектов/ }));
+  await user.click(
+    await screen.findByRole('button', {
+      name: /Расписание.*2 файла.*1 ссылка/,
+    }),
+  );
+  expect(screen.getByText('Расписание для группы')).toBeTruthy();
+});
+
+it('редактирует проект, прикрепляет материалы и подтверждает удаление', async () => {
+  const user = userEvent.setup();
+  current = student;
+  const path = '/api/profile/projects/1';
+  const project = {
+    id: 1,
+    title: 'Расписание',
+    description: 'Описание',
+    role: '',
+  };
+  handlers.set('GET /api/profile/projects', () => Response.json([project]));
+  handlers.set('GET ' + path, () => Response.json({ files: [], links: [] }));
+  handlers.set('PUT ' + path, (options) =>
+    Response.json({ id: 1, ...JSON.parse(String(options.body)) }),
+  );
+  const upload = vi.fn((options: RequestInit) => {
+    const file = (options.body as FormData).get('file') as File;
+    return Response.json(
+      { id: 2, name: file.name, size: file.size },
+      { status: 201 },
+    );
+  });
+  handlers.set('POST ' + path + '/files', upload);
+  handlers.set('POST ' + path + '/links', (options) => {
+    const link = JSON.parse(String(options.body)) as {
+      url: string;
+      label: string;
+    };
+    if (!link.url.startsWith('https://'))
+      return Response.json(
+        { detail: 'Введите адрес HTTP или HTTPS.' },
+        { status: 400 },
+      );
+    return Response.json(link, { status: 201 });
+  });
+  const remove = vi.fn(() => new Response(null, { status: 204 }));
+  handlers.set('DELETE ' + path, remove);
+  render(<App />);
+
+  await user.click(await screen.findByRole('button', { name: /Расписание/ }));
+  await user.click(
+    screen.getByRole('button', { name: 'Редактировать проект' }),
+  );
+  const title = screen.getByLabelText('Название');
+  await user.clear(title);
+  await user.type(title, 'Расписание группы');
+  await user.click(screen.getByRole('button', { name: 'Сохранить проект' }));
+  expect(
+    await screen.findByRole('heading', { name: 'Расписание группы' }),
+  ).toBeTruthy();
+
+  const file = new File(['%PDF-1.7'], 'Отчёт.pdf', { type: 'application/pdf' });
+  await user.upload(await screen.findByLabelText('Файл проекта'), file);
+  await user.click(screen.getByRole('button', { name: 'Прикрепить файл' }));
+  await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+  const sent = (upload.mock.calls[0][0].body as FormData).get('file');
+  expect(sent).toMatchObject({ name: file.name, size: file.size });
+  expect(
+    (await screen.findByRole('link', { name: 'Отчёт.pdf' })).getAttribute(
+      'href',
+    ),
+  ).toBe(path + '/files/2');
+
+  await user.click(screen.getByRole('button', { name: 'Добавить ссылку' }));
+  const address = screen.getByLabelText('Адрес ссылки') as HTMLInputElement;
+  await user.type(address, 'ftp://example.org');
+  await user.click(screen.getByRole('button', { name: 'Добавить ссылку' }));
+  expect(await screen.findByText('Введите адрес HTTP или HTTPS.')).toBeTruthy();
+  expect(address.value).toBe('ftp://example.org');
+  await user.clear(address);
+  await user.type(address, 'https://example.org');
+  await user.click(screen.getByRole('button', { name: 'Добавить ссылку' }));
+  expect(
+    (await screen.findByRole('link', { name: /example.org/ })).getAttribute(
+      'href',
+    ),
+  ).toBe('https://example.org');
+
+  vi.mocked(window.confirm).mockReturnValueOnce(false);
+  await user.click(screen.getByRole('button', { name: 'Удалить проект' }));
+  expect(remove).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Удалить проект' }));
+  expect(await screen.findByText('У вас пока нет проектов.')).toBeTruthy();
+  expect(remove).toHaveBeenCalledTimes(1);
+});
 
 it('открывает вход и переключает регистрацию', async () => {
   const user = userEvent.setup();

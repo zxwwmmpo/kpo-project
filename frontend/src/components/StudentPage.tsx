@@ -9,6 +9,7 @@ import {
 import Contacts from './Contacts';
 import Feedback from './Feedback';
 import Photo from './Photo';
+import ProjectPortfolio from './ProjectPortfolio';
 
 export default function StudentPage() {
   const [data, setData] = useState<{
@@ -276,6 +277,7 @@ function ProfileContent({
         </section>
         <Contacts />
       </div>
+      <ProjectPortfolio />
     </>
   );
 }

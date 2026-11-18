@@ -73,6 +73,136 @@ class StudentAccountIT {
   }
 
   @Test
+  void savesAchievementsAtDateBoundariesAndRestrictsCertificateDownload() throws Exception {
+    String path = "/api/profile/achievements";
+    byte[] pdf = "%PDF-1.7".getBytes(StandardCharsets.UTF_8);
+    var certificate = new MockMultipartFile("certificate", "Диплом.pdf", "application/pdf", pdf);
+    var other = authenticate("/api/auth/register", newEmail(), 201);
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+    mockMvc.perform(get(path).session(admin)).andExpect(status().isForbidden());
+
+    var created =
+        mockMvc
+            .perform(
+                multipart(path)
+                    .file(certificate)
+                    .param("title", " Олимпиада ")
+                    .param("date", "2026-12-31")
+                    .param("description", "Первое место")
+                    .session(student)
+                    .header(AJAX_HEADER, AJAX_VALUE))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.title").value("Олимпиада"))
+            .andExpect(jsonPath("$.date").value("2026-12-31"))
+            .andReturn();
+    int id = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+    mockMvc
+        .perform(
+            multipart(path)
+                .file(certificate)
+                .param("title", "Выставка")
+                .param("date", "1926-01-01")
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.description").value(""));
+
+    mockMvc
+        .perform(get(path).session(student))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].certificateName").value("Диплом.pdf"))
+        .andExpect(jsonPath("$[0].description").value("Первое место"))
+        .andExpect(jsonPath("$[1].title").value("Выставка"));
+    mockMvc.perform(get(path).session(other)).andExpect(jsonPath("$.length()").value(0));
+    String download = path + "/" + id + "/certificate";
+    mockMvc.perform(get(download).session(other)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(get(download).session(student))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Disposition", startsWith("attachment")))
+        .andExpect(content().bytes(pdf));
+    mockMvc
+        .perform(delete(path + "/" + id).session(other).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNotFound());
+    mockMvc.perform(get(download).session(student)).andExpect(status().isOk());
+    mockMvc
+        .perform(delete(path + "/" + id).session(student).header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isNoContent());
+    mockMvc.perform(get(download).session(student)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(get(path).session(student))
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].title").value("Выставка"));
+  }
+
+  @Test
+  void rejectsInvalidAchievementsAndCertificatesWithoutSaving() throws Exception {
+    String path = "/api/profile/achievements";
+    var certificate =
+        new MockMultipartFile(
+            "certificate",
+            "Диплом.pdf",
+            "application/pdf",
+            "%PDF-1.7".getBytes(StandardCharsets.UTF_8));
+    for (String date : new String[] {"1111-11-11", "1925-12-31", "2027-01-01"}) {
+      mockMvc
+          .perform(
+              multipart(path)
+                  .file(certificate)
+                  .param("title", "Олимпиада")
+                  .param("date", date)
+                  .session(student)
+                  .header(AJAX_HEADER, AJAX_VALUE))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.detail").value("Укажите дату с 01.01.1926 по 31.12.2026."));
+    }
+    mockMvc
+        .perform(
+            multipart(path)
+                .param("title", "Олимпиада")
+                .param("date", "2026-11-17")
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.detail").value("Прикрепите сертификат."));
+    var invalid =
+        new MockMultipartFile("certificate", "fake.pdf", "application/pdf", new byte[] {1});
+    var oversized =
+        new MockMultipartFile(
+            "certificate", "big.pdf", "application/pdf", new byte[5 * 1024 * 1024 + 1]);
+    mockMvc
+        .perform(
+            multipart(path)
+                .param("title", "Олимпиада")
+                .param("date", "invalid")
+                .param("description", "Первое место")
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            multipart(path)
+                .file(invalid)
+                .param("title", "Олимпиада")
+                .param("date", "2026-11-17")
+                .param("description", "Первое место")
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            multipart(path)
+                .file(oversized)
+                .param("title", "Олимпиада")
+                .param("date", "2026-11-17")
+                .param("description", "Первое место")
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().is(413));
+    mockMvc.perform(get(path).session(student)).andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
   void accessDependsOnAuthenticationAndRole() throws Exception {
     mockMvc.perform(get("/api/profile")).andExpect(status().isUnauthorized());
 

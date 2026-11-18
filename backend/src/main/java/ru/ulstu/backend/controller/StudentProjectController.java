@@ -129,14 +129,7 @@ public class StudentProjectController {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Можно прикрепить до 5 файлов.");
     }
 
-    String name = optionalText(file.getOriginalFilename());
-    if (name.isEmpty()
-        || name.length() > 255
-        || name.contains("/")
-        || name.contains("\\")
-        || name.chars().anyMatch(Character::isISOControl)) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Недопустимое имя файла.");
-    }
+    String name = ProjectFileValidator.validatedName(file.getOriginalFilename());
     byte[] content = file.getBytes();
     ProjectFileValidator.validate(name, content);
     var saved =

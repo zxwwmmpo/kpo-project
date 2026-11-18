@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -67,6 +68,7 @@ beforeEach(() => {
     if (path === '/api/profile') return Response.json(emptyProfile);
     if (path === '/api/profile/contacts') return Response.json([]);
     if (path === '/api/profile/projects') return Response.json([]);
+    if (path === '/api/profile/achievements') return Response.json([]);
     if (path === '/api/profile/photo')
       return new Response(null, { status: 404 });
     if (path === '/api/catalog/faculties') return Response.json(faculties);
@@ -86,6 +88,93 @@ async function credentials(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText('Email'), student.email);
   await user.type(screen.getByLabelText('Пароль'), 'Student123!');
 }
+
+it('сохраняет достижение с сертификатом и удаляет его после подтверждения', async () => {
+  const user = userEvent.setup();
+  current = student;
+  const path = '/api/profile/achievements';
+  const create = vi.fn((options: RequestInit) => {
+    const fields = options.body as FormData;
+    const certificate = fields.get('certificate') as File;
+    return Response.json(
+      {
+        id: 7,
+        title: fields.get('title'),
+        date: fields.get('date'),
+        description: fields.get('description'),
+        certificateName: certificate.name,
+      },
+      { status: 201 },
+    );
+  });
+  handlers.set('POST ' + path, create);
+  const remove = vi.fn(() => new Response(null, { status: 204 }));
+  handlers.set('DELETE ' + path + '/7', remove);
+  render(<App />);
+
+  const summary = within(
+    await screen.findByRole('navigation', { name: 'Сводка портфолио' }),
+  );
+  const achievementsLink = await summary.findByRole('link', {
+    name: 'Достижения 0',
+  });
+  expect(achievementsLink.getAttribute('href')).toBe('#portfolio-achievements');
+  await user.click(achievementsLink);
+  expect(
+    screen.getByText('Достижения', { selector: 'summary' }).closest('details')
+      ?.open,
+  ).toBe(true);
+  expect(await screen.findByText('У вас пока нет достижений.')).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Добавить достижение' }));
+  await user.type(screen.getByLabelText('Название достижения'), 'Олимпиада');
+  const date = screen.getByLabelText('Дата достижения') as HTMLInputElement;
+  fireEvent.change(date, { target: { value: '1111-11-11' } });
+  expect(date.validity.rangeUnderflow).toBe(true);
+  fireEvent.change(date, { target: { value: '2027-01-01' } });
+  expect(date.validity.rangeOverflow).toBe(true);
+  fireEvent.change(date, {
+    target: { value: '2026-11-17' },
+  });
+  await user.click(
+    screen.getByRole('button', { name: 'Сохранить достижение' }),
+  );
+  expect(await screen.findByText('Прикрепите сертификат.')).toBeTruthy();
+  expect(create).not.toHaveBeenCalled();
+  const file = new File(['%PDF-1.7'], 'Диплом.pdf', {
+    type: 'application/pdf',
+  });
+  await user.upload(screen.getByLabelText('Выбрать сертификат'), file);
+  await user.click(
+    screen.getByRole('button', { name: 'Сохранить достижение' }),
+  );
+
+  expect(await screen.findByText('Олимпиада')).toBeTruthy();
+  expect(
+    await summary.findByRole('link', { name: 'Достижения 1' }),
+  ).toBeTruthy();
+  expect(screen.getByText('17.11.2026')).toBeTruthy();
+  expect((create.mock.calls[0][0].body as FormData).get('description')).toBe(
+    '',
+  );
+  expect(
+    screen.getByRole('link', { name: 'Диплом.pdf' }).getAttribute('href'),
+  ).toBe(path + '/7/certificate');
+  expect(
+    (create.mock.calls[0][0].body as FormData).get('certificate'),
+  ).toMatchObject({ name: file.name, size: file.size });
+  const trash = screen.getByRole('button', {
+    name: /Удалить достижение.*Олимпиада/,
+  });
+  vi.mocked(window.confirm).mockReturnValueOnce(false);
+  await user.click(trash);
+  expect(remove).not.toHaveBeenCalled();
+  await user.click(trash);
+  expect(await screen.findByText('У вас пока нет достижений.')).toBeTruthy();
+  expect(
+    await summary.findByRole('link', { name: 'Достижения 0' }),
+  ).toBeTruthy();
+  expect(remove).toHaveBeenCalledTimes(1);
+});
 
 it('создаёт проект и открывает его из списка портфолио', async () => {
   const user = userEvent.setup();
@@ -117,8 +206,16 @@ it('создаёт проект и открывает его из списка �
   render(<App />);
 
   expect(await screen.findByText('У вас пока нет проектов.')).toBeTruthy();
-  await user.click(screen.getByText('Достижения', { selector: 'summary' }));
-  expect(screen.getByText('Достижения').closest('details')?.open).toBe(true);
+  const summary = within(
+    screen.getByRole('navigation', { name: 'Сводка портфолио' }),
+  );
+  const projectsLink = await summary.findByRole('link', { name: 'Проекты 0' });
+  expect(projectsLink.getAttribute('href')).toBe('#portfolio-projects');
+  const projectSection = screen.getByText('Проекты', { selector: 'summary' });
+  await user.click(projectSection);
+  expect(projectSection.closest('details')?.open).toBe(false);
+  await user.click(projectsLink);
+  expect(projectSection.closest('details')?.open).toBe(true);
 
   await user.click(screen.getByRole('button', { name: 'Добавить проект' }));
   await user.type(screen.getByLabelText('Название'), 'Расписание');
@@ -133,6 +230,7 @@ it('создаёт проект и открывает его из списка �
     await screen.findByRole('heading', { name: 'Расписание' }),
   ).toBeTruthy();
   expect(screen.getByText('Роль в проекте — Автор')).toBeTruthy();
+  expect(await summary.findByRole('link', { name: 'Проекты 1' })).toBeTruthy();
   expect(create).toHaveBeenCalledTimes(1);
   await user.click(screen.getByRole('button', { name: /К списку проектов/ }));
   await user.click(

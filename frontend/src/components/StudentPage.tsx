@@ -72,6 +72,8 @@ function ProfileContent({
   const [about, setAbout] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const [projectCount, setProjectCount] = useState<number | null>(null);
+  const [achievementCount, setAchievementCount] = useState<number | null>(null);
   function edit(mode: 'profile' | 'about') {
     setEditing(mode);
     setName(profile.fullName || '');
@@ -123,7 +125,14 @@ function ProfileContent({
   );
   return (
     <>
-      <section className="card profile-card" aria-label="Профиль студента">
+      <section
+        className={
+          editing === 'profile'
+            ? 'card profile-card'
+            : 'card profile-card profile-card-with-summary'
+        }
+        aria-label="Профиль студента"
+      >
         <Photo />
         <div className="profile-info">
           {editing === 'profile' ? (
@@ -234,6 +243,37 @@ function ProfileContent({
             </>
           )}
         </div>
+        {editing !== 'profile' && (
+          <nav className="profile-summary" aria-label="Сводка портфолио">
+            {[
+              {
+                id: 'portfolio-projects',
+                label: 'Проекты',
+                count: projectCount,
+              },
+              {
+                id: 'portfolio-achievements',
+                label: 'Достижения',
+                count: achievementCount,
+              },
+            ].map(({ id, label, count }) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                aria-label={count === null ? label : `${label} ${count}`}
+                onClick={() => {
+                  const section = document.getElementById(id);
+                  if (section instanceof HTMLDetailsElement)
+                    section.open = true;
+                }}
+              >
+                <span>{label}</span>
+                <span className="profile-summary-dot" aria-hidden="true" />
+                <span className="profile-summary-count">{count ?? '—'}</span>
+              </a>
+            ))}
+          </nav>
+        )}
       </section>
       <div className="profile-columns">
         <section className="card" aria-labelledby="about-title">
@@ -277,7 +317,10 @@ function ProfileContent({
         </section>
         <Contacts />
       </div>
-      <ProjectPortfolio />
+      <ProjectPortfolio
+        onProjectCount={setProjectCount}
+        onAchievementCount={setAchievementCount}
+      />
     </>
   );
 }

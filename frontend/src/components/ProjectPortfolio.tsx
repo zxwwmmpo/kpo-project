@@ -1,17 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, message } from '../api/account';
+import { api, message, type Project } from '../api/account';
 import Feedback from './Feedback';
 import AchievementPortfolio from './AchievementPortfolio';
 import ProjectMaterials from './ProjectMaterials';
-
-type Project = {
-  id: number;
-  title: string;
-  description: string;
-  role: string;
-  fileCount?: number;
-  linkCount?: number;
-};
 
 const plural = new Intl.PluralRules('ru');
 function countLabel(count: number, one: string, few: string, many: string) {

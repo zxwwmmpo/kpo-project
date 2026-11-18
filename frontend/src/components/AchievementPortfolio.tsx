@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, message, request } from '../api/account';
+import { api, message, request, type Achievement } from '../api/account';
 import Feedback from './Feedback';
-
-type Achievement = {
-  id: number;
-  title: string;
-  date: string;
-  description: string;
-  certificateName: string | null;
-};
 
 const path = '/profile/achievements';
 

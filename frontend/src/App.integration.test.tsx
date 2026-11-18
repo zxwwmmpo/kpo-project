@@ -89,6 +89,176 @@ async function credentials(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Пароль'), 'Student123!');
 }
 
+it('собирает профиль, контакты и портфолио в печатном шаблоне', async () => {
+  const user = userEvent.setup();
+  const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+  current = student;
+  handlers.set('GET /api/profile', () =>
+    Response.json({
+      ...emptyProfile,
+      fullName: 'Анна Смирнова',
+      faculty: faculties[0],
+      direction: directions[0],
+      studyGroup: groups[0],
+      about: 'Разрабатываю приложения.',
+    }),
+  );
+  handlers.set('GET /api/profile/contacts', () =>
+    Response.json([
+      { id: 1, type: 'PHONE', value: '+79001234567' },
+      { id: 2, type: 'GITHUB', value: 'https://github.com/student' },
+    ]),
+  );
+  handlers.set('GET /api/profile/projects', () =>
+    Response.json([
+      {
+        id: 2,
+        title: 'Расписание',
+        description: 'Приложение для группы',
+        role: 'Автор',
+        linkCount: 1,
+      },
+      {
+        id: 1,
+        title: 'Архив',
+        description: 'Описание архива',
+        role: '',
+        linkCount: 0,
+      },
+    ]),
+  );
+  handlers.set('GET /api/profile/projects/2', () =>
+    Response.json({
+      links: [
+        {
+          label: 'Репозиторий расписания',
+          url: 'https://example.org/schedule',
+        },
+      ],
+    }),
+  );
+  handlers.set('GET /api/profile/achievements', () =>
+    Response.json([
+      {
+        id: 1,
+        title: 'Олимпиада',
+        date: '2026-11-17',
+        description: 'Первое место',
+        certificateName: 'Диплом.pdf',
+      },
+    ]),
+  );
+  render(<App />);
+
+  await user.click(
+    await screen.findByRole('button', { name: 'Выгрузить профиль' }),
+  );
+  const document = within(
+    await screen.findByRole('article', { name: 'Документ профиля' }),
+  );
+  expect(document.getByRole('heading', { name: 'Анна Смирнова' })).toBeTruthy();
+  expect(
+    document.getByRole('img', { name: 'Заглушка фотографии' }).textContent,
+  ).toBe('АС');
+  expect(document.getByText('Группа ПИбд-41')).toBeTruthy();
+  expect(document.getByText('Разрабатываю приложения.')).toBeTruthy();
+  expect(
+    document.getByRole('link', { name: student.email }).getAttribute('href'),
+  ).toBe('mailto:' + student.email);
+  expect(
+    document.getByRole('link', { name: '+79001234567' }).getAttribute('href'),
+  ).toBe('tel:+79001234567');
+  expect(
+    document.getByRole('link', { name: 'https://github.com/student' }),
+  ).toBeTruthy();
+  expect(document.getByRole('heading', { name: 'Проекты · 2' })).toBeTruthy();
+  expect(document.getByText('Приложение для группы')).toBeTruthy();
+  expect(document.getByText('Роль — Автор')).toBeTruthy();
+  expect(
+    document.getByRole('link', { name: 'https://example.org/schedule' }),
+  ).toBeTruthy();
+  expect(
+    document.getByRole('heading', { name: 'Достижения · 1' }),
+  ).toBeTruthy();
+  expect(
+    document.getByRole('heading', { name: 'Олимпиада · 17.11.2026' }),
+  ).toBeTruthy();
+  expect(document.getByText('Сертификат — Диплом.pdf')).toBeTruthy();
+  expect(
+    fetchMock.mock.calls.some(([path]) => path === '/api/profile/projects/1'),
+  ).toBe(false);
+
+  await user.click(screen.getByRole('button', { name: 'Печать / PDF' }));
+  expect(print).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole('button', { name: /К профилю/ }));
+  expect(
+    screen.queryByRole('article', { name: 'Документ профиля' }),
+  ).toBeNull();
+  expect(screen.getByRole('button', { name: 'Выгрузить профиль' })).toBe(
+    window.document.activeElement,
+  );
+});
+
+it('разрешает печать после загрузки фотографии в предпросмотре', async () => {
+  const user = userEvent.setup();
+  const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+  current = student;
+  handlers.set(
+    'GET /api/profile/photo',
+    () => new Response('photo', { headers: { 'Content-Type': 'image/png' } }),
+  );
+  render(<App />);
+
+  await user.click(
+    await screen.findByRole('button', { name: 'Выгрузить профиль' }),
+  );
+  const photo = await screen.findByRole('img', { name: 'Фото студента' });
+  const printButton = screen.getByRole('button', {
+    name: 'Печать / PDF',
+  }) as HTMLButtonElement;
+  expect(printButton.disabled).toBe(true);
+  fireEvent.load(photo);
+  expect(printButton.disabled).toBe(false);
+  await user.click(printButton);
+  expect(print).toHaveBeenCalledTimes(1);
+});
+
+it('повторяет сбор данных после ошибки и показывает пустое портфолио', async () => {
+  const user = userEvent.setup();
+  current = student;
+  render(<App />);
+  const exportButton = await screen.findByRole('button', {
+    name: 'Выгрузить профиль',
+  });
+  handlers.set('GET /api/profile/contacts', () =>
+    Response.json(
+      { detail: 'Не удалось загрузить контакты.' },
+      { status: 503 },
+    ),
+  );
+  await user.click(exportButton);
+  expect((await screen.findByRole('alert')).textContent).toBe(
+    'Не удалось загрузить контакты.',
+  );
+  expect(
+    (screen.getByRole('button', { name: 'Печать / PDF' }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  handlers.delete('GET /api/profile/contacts');
+  await user.click(screen.getByRole('button', { name: 'Повторить' }));
+
+  const document = within(
+    await screen.findByRole('article', { name: 'Документ профиля' }),
+  );
+  expect(
+    document
+      .getByRole('img', { name: 'Заглушка фотографии' })
+      .querySelector('svg'),
+  ).toBeTruthy();
+  expect(document.getByText('Проектов пока нет.')).toBeTruthy();
+  expect(document.getByText('Достижений пока нет.')).toBeTruthy();
+});
+
 it('сохраняет достижение с сертификатом и удаляет его после подтверждения', async () => {
   const user = userEvent.setup();
   current = student;

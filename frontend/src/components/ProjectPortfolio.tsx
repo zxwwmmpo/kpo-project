@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, message } from '../api/account';
 import Feedback from './Feedback';
+import AchievementPortfolio from './AchievementPortfolio';
 import ProjectMaterials from './ProjectMaterials';
 
 type Project = {
@@ -20,7 +21,13 @@ function countLabel(count: number, one: string, few: string, many: string) {
 
 const path = '/profile/projects';
 
-export default function ProjectPortfolio() {
+export default function ProjectPortfolio({
+  onProjectCount,
+  onAchievementCount,
+}: {
+  onProjectCount: (count: number | null) => void;
+  onAchievementCount: (count: number | null) => void;
+}) {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [version, setVersion] = useState(0);
@@ -30,6 +37,11 @@ export default function ProjectPortfolio() {
   const [deleteError, setDeleteError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [savingMaterials, setSavingMaterials] = useState(false);
+  const projectCount = projects?.length ?? null;
+
+  useEffect(() => {
+    onProjectCount(projectCount);
+  }, [onProjectCount, projectCount]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -66,7 +78,7 @@ export default function ProjectPortfolio() {
   return (
     <section className="card portfolio" aria-labelledby="portfolio-title">
       <h2 id="portfolio-title">Портфолио</h2>
-      <details open>
+      <details id="portfolio-projects" open>
         <summary>Проекты</summary>
         <div className="portfolio-content">
           {adding || editing ? (
@@ -199,10 +211,7 @@ export default function ProjectPortfolio() {
           )}
         </div>
       </details>
-      <details>
-        <summary>Достижения</summary>
-        <p className="muted">Раздел пока недоступен.</p>
-      </details>
+      <AchievementPortfolio onCount={onAchievementCount} />
     </section>
   );
 }

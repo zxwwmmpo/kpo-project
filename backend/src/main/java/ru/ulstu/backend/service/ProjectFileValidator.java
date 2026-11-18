@@ -13,6 +13,18 @@ public final class ProjectFileValidator {
 
   private ProjectFileValidator() {}
 
+  public static String validatedName(String filename) {
+    String name = filename == null ? "" : filename.strip();
+    if (name.isEmpty()
+        || name.length() > 255
+        || name.contains("/")
+        || name.contains("\\")
+        || name.chars().anyMatch(Character::isISOControl)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Недопустимое имя файла.");
+    }
+    return name;
+  }
+
   public static void validate(String name, byte[] content) {
     String extension = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
     boolean supported =

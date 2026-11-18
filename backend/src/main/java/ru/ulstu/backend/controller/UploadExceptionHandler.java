@@ -13,10 +13,13 @@ public class UploadExceptionHandler {
   @ExceptionHandler(MaxUploadSizeExceededException.class)
   public ProblemDetail handleUploadSize(
       MaxUploadSizeExceededException exception, HttpServletRequest request) {
+    String path = request.getRequestURI();
     String message =
-        request.getRequestURI().endsWith("/files")
-            ? "Размер файла не должен превышать 5 МБ."
-            : "Размер фотографии не должен превышать 5 МБ";
+        path.endsWith("/achievements")
+            ? "Размер сертификата не должен превышать 5 МБ."
+            : path.endsWith("/files")
+                ? "Размер файла не должен превышать 5 МБ."
+                : "Размер фотографии не должен превышать 5 МБ";
     return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, message);
   }
 }

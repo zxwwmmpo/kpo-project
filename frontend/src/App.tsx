@@ -87,7 +87,11 @@ function App() {
     );
   if (user)
     return (
-      <div className="workspace">
+      <div
+        className={
+          user.role === 'STUDENT' ? 'workspace student-workspace' : 'workspace'
+        }
+      >
         <header className="topbar">
           <a className="brand" href="/">
             Электронное портфолио

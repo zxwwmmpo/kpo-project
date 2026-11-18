@@ -462,6 +462,51 @@ class StudentAccountIT {
   }
 
   @Test
+  void editedProfileRetainsNewNameGroupAndMaximumAboutLength() throws Exception {
+    long faculty = createEntry("faculties", "Факультет " + UUID.randomUUID(), null);
+    long direction = createEntry("directions", "Направление", faculty);
+    long first = createEntry("groups", "Первая", direction);
+    long second = createEntry("groups", "Вторая", direction);
+    String about = "Я".repeat(500);
+    for (String body :
+        new String[] {
+          profileBody(first, "О себе"),
+          profileBody(second, about).replace("Иванов Иван Иванович", "Анна Смирнова")
+        }) {
+      mockMvc
+          .perform(
+              put("/api/profile")
+                  .session(student)
+                  .header(AJAX_HEADER, AJAX_VALUE)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isOk());
+    }
+    mockMvc
+        .perform(get("/api/profile").session(student))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.fullName").value("Анна Смирнова"))
+        .andExpect(jsonPath("$.studyGroup.id").value(second))
+        .andExpect(jsonPath("$.about").value(about));
+  }
+
+  @Test
+  void oversizedPhotoPreservesExistingPhoto() throws Exception {
+    uploadPhoto(student, 0x0000FF);
+    MockMultipartFile oversized =
+        new MockMultipartFile(
+            "file", "large.png", MediaType.IMAGE_PNG_VALUE, new byte[5 * 1024 * 1024 + 1]);
+    mockMvc
+        .perform(
+            multipart("/api/profile/photo")
+                .file(oversized)
+                .session(student)
+                .header(AJAX_HEADER, AJAX_VALUE))
+        .andExpect(status().is(413));
+    assertEquals(0x0000FF, photoColor(student));
+  }
+
+  @Test
   void contactsAreValidatedAndAccessibleOnlyToTheirOwner() throws Exception {
     MvcResult created =
         mockMvc

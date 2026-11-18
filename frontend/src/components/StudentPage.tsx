@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type Ref } from 'react';
 import {
   api,
   loadCatalog,
@@ -9,6 +9,7 @@ import {
 import Contacts from './Contacts';
 import Feedback from './Feedback';
 import Photo from './Photo';
+import ProfileExport from './ProfileExport';
 import ProjectPortfolio from './ProjectPortfolio';
 
 export default function StudentPage() {
@@ -18,6 +19,11 @@ export default function StudentPage() {
   } | null>(null);
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const exportButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!exporting) exportButton.current?.focus();
+  }, [exporting]);
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
@@ -47,11 +53,18 @@ export default function StudentPage() {
       </section>
     );
   return (
-    <ProfileContent
-      profile={data.profile}
-      catalog={data.catalog}
-      onChange={(profile) => setData({ ...data, profile })}
-    />
+    <>
+      <div hidden={exporting}>
+        <ProfileContent
+          profile={data.profile}
+          catalog={data.catalog}
+          onChange={(profile) => setData({ ...data, profile })}
+          onExport={() => setExporting(true)}
+          exportButton={exportButton}
+        />
+      </div>
+      {exporting && <ProfileExport onClose={() => setExporting(false)} />}
+    </>
   );
 }
 
@@ -59,10 +72,14 @@ function ProfileContent({
   profile,
   catalog,
   onChange,
+  onExport,
+  exportButton,
 }: {
   profile: Profile;
   catalog: Catalog;
   onChange: (profile: Profile) => void;
+  onExport: () => void;
+  exportButton: Ref<HTMLButtonElement>;
 }) {
   const [editing, setEditing] = useState<'profile' | 'about' | null>(null);
   const [name, setName] = useState('');
@@ -272,6 +289,14 @@ function ProfileContent({
                 <span className="profile-summary-count">{count ?? '—'}</span>
               </a>
             ))}
+            <button
+              className="profile-export-link"
+              type="button"
+              ref={exportButton}
+              onClick={onExport}
+            >
+              Выгрузить профиль
+            </button>
           </nav>
         )}
       </section>

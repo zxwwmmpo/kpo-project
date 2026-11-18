@@ -1,0 +1,142 @@
+.profile-export {
+  max-width: 210mm;
+  margin: 0 auto;
+}
+.profile-export-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.profile-export-toolbar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.profile-export-toolbar h1:focus {
+  outline: none;
+}
+.profile-export-note {
+  margin: 0 0 12px;
+}
+.profile-export-sheet {
+  min-height: 297mm;
+  padding: clamp(20px, 6vw, 16mm);
+  background: #fff;
+  color: #182236;
+  color-scheme: light;
+  overflow-wrap: anywhere;
+}
+.export-student {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  border-bottom: 1px solid #cdd4df;
+  padding-bottom: 18px;
+}
+.export-avatar {
+  width: 84px;
+  height: 84px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.export-avatar-placeholder {
+  display: grid;
+  place-items: center;
+  background: #e9edf2;
+  color: #49566a;
+  font-weight: 650;
+  font-size: 1.4rem;
+  print-color-adjust: exact;
+}
+.profile-export-sheet h2 {
+  margin: 0 0 6px;
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+.profile-export-sheet section {
+  margin-top: 22px;
+}
+.profile-export-sheet h3 {
+  margin: 0 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #cdd4df;
+  font-size: 1.1rem;
+}
+.profile-export-sheet h4 {
+  margin: 0 0 3px;
+  font-size: 1rem;
+}
+.profile-export-sheet p {
+  margin: 0 0 4px;
+}
+.export-entry + .export-entry {
+  margin-top: 14px;
+}
+.export-paragraph {
+  white-space: pre-wrap;
+}
+.export-contacts,
+.export-links {
+  margin: 0;
+  padding-left: 18px;
+}
+.profile-export-sheet a {
+  color: #175280;
+}
+@media screen and (max-width: 600px) {
+  .export-student {
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .export-avatar {
+    width: 56px;
+    height: 56px;
+  }
+}
+@page student-profile {
+  size: A4;
+  margin: 16mm;
+}
+@media print {
+  html:has(.profile-export-sheet),
+  body:has(.profile-export-sheet) {
+    background: #fff;
+    color-scheme: light;
+  }
+  .workspace:has(.profile-export-sheet)::before,
+  .workspace:has(.profile-export-sheet) > .topbar,
+  .workspace-main:has(.profile-export-sheet) > :not(.profile-export),
+  .profile-export-toolbar,
+  .profile-export-note {
+    display: none;
+  }
+  .workspace:has(.profile-export-sheet),
+  .workspace-main:has(.profile-export-sheet),
+  .profile-export:has(.profile-export-sheet),
+  .profile-export-sheet {
+    min-height: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .profile-export-sheet {
+    page: student-profile;
+    font-size: 10.5pt;
+  }
+  .export-student,
+  .export-contacts li,
+  .export-links li {
+    break-inside: avoid;
+  }
+  .profile-export-sheet h3,
+  .profile-export-sheet h4 {
+    break-after: avoid;
+  }
+  .profile-export-sheet p {
+    orphans: 2;
+    widows: 2;
+  }
+}

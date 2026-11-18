@@ -245,16 +245,27 @@ small {
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
   align-items: center;
+  text-decoration: none;
+}
+.profile-summary a,
+.profile-summary .profile-export-link {
   padding: 6px 0;
   color: rgb(255 255 255 / 66%);
-  text-decoration: none;
+}
+.profile-summary .profile-export-link {
+  grid-column: 1 / -1;
+  justify-self: start;
+  text-align: left;
 }
 .profile-summary a > :first-child {
   justify-self: end;
 }
 .profile-summary a:hover,
-.profile-summary a:focus-visible {
+.profile-summary a:focus-visible,
+.profile-summary .profile-export-link:hover,
+.profile-summary .profile-export-link:focus-visible {
   color: rgb(255 255 255 / 88%);
+  text-decoration: none;
 }
 .profile-summary-dot {
   width: 4px;

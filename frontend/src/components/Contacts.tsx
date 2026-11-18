@@ -1,21 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, message, type Contact } from '../api/account';
+import { contactLabels, contactLink } from '../api/contactLinks';
 import Feedback from './Feedback';
-
-const labels = { PHONE: 'Телефон', URL: 'URL', GITHUB: 'GitHub' };
-
-function link(contact: Contact) {
-  if (contact.type === 'PHONE')
-    return /^\+[1-9][0-9]{7,14}$/.test(contact.value)
-      ? 'tel:' + contact.value
-      : undefined;
-  try {
-    const url = new URL(contact.value);
-    return ['https:', 'http:'].includes(url.protocol) ? url.href : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -136,9 +122,9 @@ export default function Contacts() {
         {contacts.map((c) => (
           <li key={c.id}>
             <div>
-              <span className="eyebrow">{labels[c.type]}</span>
+              <span className="eyebrow">{contactLabels[c.type]}</span>
               <a
-                href={link(c)}
+                href={contactLink(c)}
                 target={c.type === 'PHONE' ? undefined : '_blank'}
                 rel="noopener noreferrer"
               >
@@ -176,7 +162,7 @@ export default function Contacts() {
                 value={type}
                 onChange={(e) => setType(e.target.value as Contact['type'])}
               >
-                {Object.entries(labels).map(([key, label]) => (
+                {Object.entries(contactLabels).map(([key, label]) => (
                   <option key={key} value={key}>
                     {label}
                   </option>

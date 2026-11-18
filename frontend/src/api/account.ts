@@ -18,6 +18,22 @@ export type Contact = {
   type: 'PHONE' | 'URL' | 'GITHUB';
   value: string;
 };
+export type Project = {
+  id: number;
+  title: string;
+  description: string;
+  role: string;
+  fileCount?: number;
+  linkCount?: number;
+};
+export type ProjectLink = { label: string; url: string };
+export type Achievement = {
+  id: number;
+  title: string;
+  date: string;
+  description: string;
+  certificateName: string | null;
+};
 
 export class ApiError extends Error {
   status: number;

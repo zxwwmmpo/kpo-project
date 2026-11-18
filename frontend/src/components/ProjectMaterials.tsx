@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, message, request } from '../api/account';
+import { api, message, request, type ProjectLink } from '../api/account';
 import Feedback from './Feedback';
 type ProjectFile = { id: number; name: string; size: number };
-type ProjectLink = { label: string; url: string };
 type Materials = { files: ProjectFile[]; links: ProjectLink[] };
 const maxFiles = 5;
 const maxFileSize = 5 * 1024 * 1024;
